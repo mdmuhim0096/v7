@@ -17,7 +17,7 @@ const io = new Server(server, {
     origin: [
       "http://localhost:5173", // Local development
       "https://mdmuhim0096.github.io",
-      "https://v3-ydbx.onrender.com"
+      "https://v7-client.onrender.com"
     ],
     methods: ['GET', 'POST'],
     credentials: true
@@ -159,7 +159,7 @@ app.use(express.static("public"));
 const allowedOrigins = [
   "http://localhost:5173", // local dev
   "https://mdmuhim0096.github.io", // deployed GitHub Pages root
-  "https://v3-ydbx.onrender.com" // optional if subpath used
+  "https://v7-client.onrender.com" // optional if subpath used
 ];
 
 app.use(cors({
