@@ -29,7 +29,12 @@ let onlineUser = {};
 
 // ✅ Socket.IO logic
 io.on('connection', (socket) => {
-
+  socket.on("block_user", data => {
+    socket.broadcast.emit("block_user", data);
+  })
+  socket.on("gmessage", data => {
+    socket.broadcast.emit("gmessage", data);
+  });
   socket.on("join_room", roomId => {
     socket.broadcast.emit("join_room", roomId);
   });
@@ -37,10 +42,14 @@ io.on('connection', (socket) => {
     socket.broadcast.emit("aftersent", roomId);
   });
 
+  socket.on("gaftersent", roomId => {
+    socket.broadcast.emit("gaftersent", roomId);
+  });
+
   socket.on("end_call", data => {
     socket.broadcast.emit("end_call", data);
   });
-  
+
   socket.on("join_call_a", data => {
     socket.broadcast.emit("join_call_a", data);
   });

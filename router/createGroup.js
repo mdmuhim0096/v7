@@ -1,21 +1,13 @@
 const Group = require("../model/createGroup");
 const route = require("express").Router();
 const multer = require("multer");
-const path = require("path");
 const People = require("../model/people");
 const { default: mongoose } = require("mongoose");
-const { deletePreviusFile } = require("../lib/fileHandeler");
+const Cloudinary = require("../databas/cloudinary");
+const streamifier = require("streamifier");
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, './public/groupImage');
-    },
-    filename: (req, file, cb) => {
-        cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
-    }
-});
-
-const upload = multer({ storage: storage });
 
 route.post("/create", async (req, res) => {
     try {
@@ -35,21 +27,58 @@ route.post("/create", async (req, res) => {
     }
 });
 
+
+// Helper: Upload buffer to Cloudinary
+const uploadFromBuffer = (buffer, publicId) => {
+    return new Promise((resolve, reject) => {
+        const stream = Cloudinary.uploader.upload_stream(
+            {
+                folder: "groupImages",
+                publicId,
+                resource_type: "image",
+            },
+            (error, result) => {
+                if (result) resolve(result);
+                else reject(error);
+            }
+        );
+        streamifier.createReadStream(buffer).pipe(stream);
+    });
+};
+
+
 route.post("/changeImage/:id", upload.single("img"), async (req, res) => {
     try {
-        const image = req.file.filename;
-        const groupImage = `/groupImage/${image}`;
-        const groupAfterFind = await Group.findById(req.params.id);
-        if (groupAfterFind && !groupAfterFind.groupImage.includes("group.png")) {
-            deletePreviusFile("/" + groupAfterFind.groupImage);
+        const group = await Group.findById(req.params.id);
+        if (!group) return res.status(404).json({ message: "Group not found" });
+
+        const publicId = `group_${req.params.id}_${Date.now()}`;
+
+        // Upload to Cloudinary from buffer
+        const result = await uploadFromBuffer(req.file.buffer, publicId);
+
+        // If previous image is not the default, delete it
+        if (group.groupImage && !group.groupImage.includes("group.png")) {
+            const parts = group.groupImage.split("/");
+            const lastPart = parts[parts.length - 1]; // e.g. group_abc_12345.jpg
+            const oldPublicId = `groupImages/${lastPart.split(".")[0]}`;
+            await Cloudinary.uploader.destroy(oldPublicId);
         }
-        const response = await Group.findByIdAndUpdate(req.params.id, { groupImage }, { new: true });
-        res.status(200).json({ message: "image changed", img: response.groupImage });
+
+        // Update group with new image URL
+        const updatedGroup = await Group.findByIdAndUpdate(
+            req.params.id,
+            { groupImage: result.secure_url },
+            { new: true }
+        );
+
+        res.status(200).json({ message: "Image changed", img: updatedGroup.groupImage });
     } catch (err) {
-        console.log(err);
-        res.status(500).json({ message: "server error" })
+        console.error("Image upload error:", err);
+        res.status(500).json({ message: "Server error" });
     }
 });
+
 
 route.post("/changeName", async (req, res) => {
     try {
@@ -80,32 +109,32 @@ route.post("/addmember/:id", async (req, res) => {
 
 // Remove a member from a group AND remove the group from that user
 route.post("/removemember/:id", async (req, res) => {
-  try {
-    const { userId } = req.body; // just send userId in body
+    try {
+        const { userId } = req.body; // just send userId in body
 
-    // 1. Pull the user from the group's members array
-    const groupUpdate = await Group.findByIdAndUpdate(
-      req.params.id,
-      { $pull: { members: { userId: userId } } },
-      { new: true }
-    );
+        // 1. Pull the user from the group's members array
+        const groupUpdate = await Group.findByIdAndUpdate(
+            req.params.id,
+            { $pull: { members: { userId: userId } } },
+            { new: true }
+        );
 
-    // 2. Pull the group from the user's groups array
-    const userUpdate = await People.findByIdAndUpdate(
-      userId,
-      { $pull: { groups: req.params.id } },
-      { new: true }
-    );
+        // 2. Pull the group from the user's groups array
+        const userUpdate = await People.findByIdAndUpdate(
+            userId,
+            { $pull: { groups: req.params.id } },
+            { new: true }
+        );
 
-    res.status(200).json({
-      message: "Member removed successfully",
-      group: groupUpdate,
-      user: userUpdate
-    });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Server error" });
-  }
+        res.status(200).json({
+            message: "Member removed successfully",
+            group: groupUpdate,
+            user: userUpdate
+        });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "Server error" });
+    }
 });
 
 route.get("/myGroup/:id", async (req, res) => {
