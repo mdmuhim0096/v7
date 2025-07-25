@@ -226,4 +226,27 @@ route.get("/isMatchGroup/:id/:uid", async (req, res) => {
     }
 });
 
+
+route.post("/filteruser", async (req, res) => {
+    try {
+        const { admin, gid } = req.body;
+
+        const group = await Group.findById(gid);
+        const memberIds = group.members.map(member => member.userId?.toString()); // Ensure string comparison
+
+        const user = await People.findById(admin).populate({
+            path: "friends",
+            select: "name image _id",
+            match: { _id: { $nin: memberIds } } // $nin with string IDs
+        });
+
+        res.status(200).json({ message: "here is your friend", friends: user.friends });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+
 module.exports = route;
