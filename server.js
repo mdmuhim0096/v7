@@ -35,6 +35,9 @@ io.on('connection', (socket) => {
   socket.on("gmessage", data => {
     socket.broadcast.emit("gmessage", data);
   });
+  socket.on("comment", data => {
+    socket.broadcast.emit("comment", data);
+  });
   socket.on("join_room", roomId => {
     socket.broadcast.emit("join_room", roomId);
   });

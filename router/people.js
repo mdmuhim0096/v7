@@ -415,7 +415,10 @@ route.post("/dactiveuser", async (req, res) => {
 
 route.get("/randomuser/:id", async (req, res) => {
     try {
+        console.log(req.params.id)
         const user = await People.findById(req.params.id).populate("friends", "name image _id");
+        if(!user) return  res.status(404).json({ message: "user not found"});
+        console.log(user)
         res.status(200).json({ message: "here is your useer", user });
     } catch (error) {
         console.log(error);

@@ -3,11 +3,16 @@ const Post = require("../model/post");
 const jwt = require("jsonwebtoken");
 const jwt_sicret = "15ef1fr5g4158dwo0k";
 const People = require("../model/people");
-const upload = require("../middleware/multer");
-
+const multer = require("multer");
 const { createNotification } = require("../middleware/notification");
 const { deletePreviusFile } = require("../lib/fileHandeler");
 const { default: mongoose } = require("mongoose");
+const Cloudinary = require("../databas/cloudinary");
+
+// Multer storage (in-memory for quick access)
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+const streamifier = require("streamifier");
 
 route.post("/createPost", upload.single("media"), async (req, res) => {
     try {
@@ -15,34 +20,56 @@ route.post("/createPost", upload.single("media"), async (req, res) => {
         const token = req.cookies.token;
         const decode = jwt.verify(token, jwt_sicret);
         const uid = decode.userId;
+
+        if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
         const mimeType = req.file.mimetype;
-        let fileType = '';
-        if (mimeType.startsWith("video/")) {
-            fileType = 'video';
-        } else if (mimeType.startsWith("image/")) {
-            fileType = "image";
-        }
+        const fileType = mimeType.startsWith("video/") ? "video" : "image";
+        const folderName = fileType === "video" ? "postVideo" : "postImage";
+        const isVideo = fileType === "video";
+        const isImage = fileType === "image";
 
-        let isVideo = false, isImage = false;
-        let directoryName = '';
+        const uploadFromBuffer = (fileBuffer) => {
+            return new Promise((resolve, reject) => {
+                const uploadStream = Cloudinary.uploader.upload_stream(
+                    {
+                        resource_type: fileType,
+                        folder: folderName,
+                    },
+                    (error, result) => {
+                        if (result) {
+                            resolve(result);
+                        } else {
+                            reject(error);
+                        }
+                    }
+                );
 
-        if (fileType === "video") {
-            directoryName = "postVideo";
-            isVideo = true
-        } else if (fileType === "image") {
-            directoryName = "postImage";
-            isImage = true
-        }
-        const destinationPath = `/${directoryName}/${req.file.filename}`;
-        const newPost = new Post({ caption, postOwner: uid, media: destinationPath, video: isVideo, image: isImage });
+                streamifier.createReadStream(fileBuffer).pipe(uploadStream);
+            });
+        };
+
+        const result = await uploadFromBuffer(req.file.buffer);
+
+        const newPost = new Post({
+            caption,
+            postOwner: uid,
+            media: result.secure_url,
+            video: isVideo,
+            image: isImage,
+        });
+
         const response = await newPost.save();
         const user = await People.findById(uid);
         const friends = user.friends;
         createNotification(friends, uid, "post", newPost._id);
-        res.status(201).json({ message: "post created successfully", data: response });
+
+        res.status(201).json({ message: "Post created successfully", data: response });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ message: "server error in post/createPost" });
+        console.error("Post creation error:", error);
+        res.status(500).json({ message: "Server error in /createPost" });
     }
 });
 
@@ -166,6 +193,7 @@ route.get("/postinfo/:id", async (req, res) => {
             .populate("comments.replies.user", "image name")
             .populate("comments.replies.replay.user", "image name")
             .populate("comments.replies.replay.replay.user", "image name gender")
+            .populate("postOwner", "name image _id")
         res.status(200).json({ message: "here is your post", singlePost });
 
     } catch (err) {
@@ -219,7 +247,7 @@ route.post("/addlike_comment", async (req, res) => {
         const post = await Post.findById(postId);
         if (!post) return res.status(404).json({ message: "post not found 404" });
         const comment = post.comments.id(commentId);
-        comment.likes.push({ user: uid });
+        comment?.likes.push({ user: uid });
         await post.save();
     } catch (error) {
         console.error("Error adding like:", error);
@@ -331,6 +359,16 @@ route.delete("/delete/:id", async (req, res) => {
         deletePreviusFile(beforDelete.media);
         await Post.findByIdAndDelete(beforDelete.id);
         res.status(200).json({ message: "delete success" })
+    } catch (err) {
+        console.log(err);
+        res.status(500).json({ message: "internal server error" });
+    }
+});
+
+route.get("/deleteall", async (req, res) => {
+    try {
+        await Post.deleteMany()
+        res.send("ok")
     } catch (err) {
         console.log(err);
         res.status(500).json({ message: "internal server error" });
