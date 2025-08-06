@@ -29,6 +29,7 @@ let onlineUser = {};
 
 // ✅ Socket.IO logic
 io.on('connection', (socket) => {
+      socket.broadcast.emit("alert", null);
   socket.on("block_user", data => {
     socket.broadcast.emit("block_user", data);
   })
@@ -41,6 +42,10 @@ io.on('connection', (socket) => {
   socket.on("join_room", roomId => {
     socket.broadcast.emit("join_room", roomId);
   });
+  socket.on("join_audio_room", data => {
+    socket.broadcast.emit("join_audio_room", data);
+  });
+  
   socket.on("aftersent", roomId => {
     socket.broadcast.emit("aftersent", roomId);
   });
@@ -157,7 +162,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    socket.broadcast.emit("__load_data__", null);
+    socket.broadcast.emit("alert", null);
     delete onlineUser;
   });
 });
@@ -202,6 +207,7 @@ const createNotificatioRouter = require("./router/createNotifications");
 const createGroupRouter = require("./router/createGroup");
 const groupChatRouter = require("./router/groupChat");
 const shareRouter = require("./router/share");
+const reportRouter = require("./router/report");
 
 app.use("/api/people", userRouter);
 app.use("/api/post", postRouter);
@@ -213,6 +219,7 @@ app.use("/api/addNoti", createNotificatioRouter);
 app.use("/api/group", createGroupRouter);
 app.use("/api/gchat", groupChatRouter);
 app.use("/api/share", shareRouter);
+app.use("/api/report", reportRouter);
 
 // ✅ Health check
 app.get("/ok", (req, res) => {

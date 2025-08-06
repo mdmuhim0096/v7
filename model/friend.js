@@ -6,15 +6,16 @@ const friendSchema = new mongoose.Schema({
     status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
     styles: {
         bg: {
-            bgType:{
-                type:String,
-                default: "image"
+            bgType: {
+                type: String,
+                default: "color"
             },
-            bg:{
-                type:String,
+            bg: {
+                type: String,
                 default: "bg-grray-400"
             }
         },
+
         text: {
             color: {
                 type: String,
@@ -30,9 +31,10 @@ const friendSchema = new mongoose.Schema({
             }
         }
     },
+    
     block: {
         blocker: String,
-        isBlock:{
+        isBlock: {
             type: Boolean,
             default: false
         }
