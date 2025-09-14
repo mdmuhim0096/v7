@@ -69,7 +69,7 @@ route.post("/signup", upload.single("img"), async (req, res) => {
             httpOnly: true,
             maxAge: 100 * 24 * 60 * 60 * 1000, // 100 days
             secure: true,
-            sameSite: "lax",
+            sameSite: "none",
         });
 
         res.status(200).json({ message: "User created successfully", data: response });
@@ -271,7 +271,7 @@ route.post("/login", async (req, res) => {
             httpOnly: true,
             maxAge: 24 * 60 * 60 * 1000 * 100,
             secure: true,
-            sameSite: "lax"
+            sameSite: "none"
         });
         res.status(200).json({ message: "logdin successfully" })
     } catch (error) {
