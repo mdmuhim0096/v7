@@ -24,12 +24,9 @@ const io = new Server(server, {
   }
 });
 
-// ✅ Online users tracking
-let onlineUser = {};
-
 // ✅ Socket.IO logic
 io.on('connection', (socket) => {
-      socket.broadcast.emit("alert", null);
+  socket.broadcast.emit("alert", null);
   socket.on("block_user", data => {
     socket.broadcast.emit("block_user", data);
   })
@@ -39,13 +36,13 @@ io.on('connection', (socket) => {
   socket.on("comment", data => {
     socket.broadcast.emit("comment", data);
   });
-  socket.on("join_room", roomId => {
-    socket.broadcast.emit("join_room", roomId);
+  socket.on("join_video_room", roomId => {
+    socket.broadcast.emit("join_video_room", roomId);
   });
   socket.on("join_audio_room", data => {
     socket.broadcast.emit("join_audio_room", data);
   });
-  
+
   socket.on("aftersent", roomId => {
     socket.broadcast.emit("aftersent", roomId);
   });
@@ -78,10 +75,6 @@ io.on('connection', (socket) => {
     socket.broadcast.emit("groupvideocall", data);
   });
 
-  socket.on("register", userId => {
-    onlineUser[userId] = socket.id;
-  });
-
   socket.on("incoming_call", userId => {
     socket.broadcast.emit("incoming_call", userId);
   });
@@ -97,6 +90,20 @@ io.on('connection', (socket) => {
   socket.on("callend", userId => {
     socket.broadcast.emit("callend", userId);
   });
+
+  socket.on("onRGAC", data => {
+    socket.broadcast.emit("onRGAC", data);
+  })
+  socket.on("onRGACM2E", data => {
+    socket.broadcast.emit("onRGACM2E", data);
+  })
+
+  socket.on("onGVC", data => {
+    socket.broadcast.emit("onGVC", data);
+  })
+  socket.on("onGVCE", data => {
+    socket.broadcast.emit("onGVCE", data);
+  })
 
   socket.on('send_message', async (data) => {
     const messageObject = {
@@ -163,7 +170,6 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     socket.broadcast.emit("alert", null);
-    delete onlineUser;
   });
 });
 
@@ -222,7 +228,7 @@ app.use("/api/share", shareRouter);
 app.use("/api/report", reportRouter);
 
 // ✅ Health check
-app.get("/ok", (req, res) => {
+app.get("/isOk", (req, res) => {
   res.send('<h1>All Right</h1>');
 });
 

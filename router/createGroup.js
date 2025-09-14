@@ -240,6 +240,8 @@ route.post("/filteruser", async (req, res) => {
             match: { _id: { $nin: memberIds } } // $nin with string IDs
         });
 
+        console.log(user)
+
         res.status(200).json({ message: "here is your friend", friends: user.friends });
 
     } catch (err) {

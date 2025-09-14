@@ -50,8 +50,8 @@ route.post('/request_accept', async (req, res) => {
         request.status = 'accepted';
         await request.save();
 
-        await People.findByIdAndUpdate(request.sender, { $push: { friends: request.receiver } });
-        await People.findByIdAndUpdate(request.receiver, { $push: { friends: request.sender } });
+        await People.findByIdAndUpdate(request.sender, { $push: { friends: request.receiver } }, { new: true });
+        await People.findByIdAndUpdate(request.receiver, { $push: { friends: request.sender } }, { new: true });
 
         res.json({ message: 'Friend request accepted' });
     } catch (error) {
