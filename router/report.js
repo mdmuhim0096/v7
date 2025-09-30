@@ -3,7 +3,6 @@ const Report = require("../model/report");
 const Post = require("../model/post");
 const Notification = require("../model/notification");
 const Counter = require("../model/counter");
-const { text } = require("express");
 
 route.post("/submit", async (req, res) => {
     try {

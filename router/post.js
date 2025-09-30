@@ -9,14 +9,13 @@ const { deletePreviusFile } = require("../lib/fileHandeler");
 const { default: mongoose } = require("mongoose");
 const Cloudinary = require("../databas/cloudinary");
 
-// Multer storage (in-memory for quick access)
-
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 const streamifier = require("streamifier");
 
 route.post("/createPost", upload.single("media"), async (req, res) => {
     try {
+
         const { caption } = req.body;
         const token = req.cookies.token;
         const decode = jwt.verify(token, jwt_sicret);
@@ -66,8 +65,8 @@ route.post("/createPost", upload.single("media"), async (req, res) => {
         const user = await People.findById(uid);
         const friends = user.friends;
         createNotification(friends, uid, "post", newPost._id);
-
         res.status(201).json({ message: "Post created successfully", data: response });
+
     } catch (error) {
         console.error("Post creation error:", error);
         res.status(500).json({ message: "Server error in /createPost" });
@@ -123,20 +122,32 @@ route.post("/addlike", async (req, res) => {
         const token = req.cookies.token;
         const decode = jwt.verify(token, jwt_sicret);
         const uid = decode.userId;
-        const { postId } = req.body;
-        const post = await Post.findById(postId);
-        if (!post) return console.log("Post not found");
+        const { postId, type } = req.body;
 
-        if (!post.likes.includes(uid)) {
-            post.likes.push(uid);
+        const post = await Post.findById(postId);
+        if (!post) return res.status(404).json({ message: "Post not found" });
+
+        // Check if user already liked with the same type
+        const alreadyLiked = post.likes.some(
+            like => like.user?.toString() === uid);
+
+        if (!alreadyLiked) {
+            // Add like
+            post.likes.push({ user: uid, type: type });
         } else {
-            post.likes = post.likes.filter(id => id.toString() !== uid);
+            // Remove like
+            post.likes = post.likes.filter(
+                like => !(like.user?.toString() === uid)
+            );
         }
 
-        await post.save();
+        const resposne = await post.save();
+        console.log(resposne)
 
+        return res.status(200).json({ message: "Like toggled successfully", post });
     } catch (error) {
         console.error("Error liking/unliking post:", error);
+        return res.status(500).json({ message: "Server error" });
     }
 });
 
@@ -151,6 +162,98 @@ route.get("/mypost", async (req, res) => {
         res.status(500).json({ message: "server error in post/mypost" });
     }
 });
+
+route.get("/getclips/:id", async (req, res) => {
+    try {
+        const User = await People.findById(req.params.id);
+        const notAllowPost = User.notAllowPost.map(id => new mongoose.Types.ObjectId(id));
+        const clip = await Post.find({ isClip: true, _id: { $nin: notAllowPost } })
+            .populate("postOwner", "username id image name")
+            .populate("comments.user", "username email")
+            .populate("comments.replies.user", "username email")
+            .populate("likes", "username");
+        res.status(200).json({ message: "here is your post", clip });
+    } catch (error) {
+        console.error("Error fetching posts:", error);
+    }
+});
+
+route.get("/getMyClips/:id", async (req, res) => {
+    try {
+
+        const clip = await Post.find({ isClip: true, postOwner: req.params.id })
+            .populate("postOwner", "username id image name")
+            .populate("comments.user", "username email")
+            .populate("comments.replies.user", "username email")
+            .populate("likes", "username");
+        res.status(200).json({ message: "here is your post", clip });
+    } catch (error) {
+        console.error("Error fetching posts:", error);
+    }
+});
+
+route.post("/createClip/:id", upload.single("media"), async (req, res) => {
+    try {
+        const { caption } = req.body;
+        const uid = new mongoose.Types.ObjectId(req.params.id); // ✅ fixed
+
+        if (!req.file) {
+            return res.status(400).json({ message: "No file uploaded" });
+        }
+
+        const mimeType = req.file.mimetype;
+        const isVideo = mimeType.startsWith("video/");
+        const isImage = mimeType.startsWith("image/");
+        const folderName = isVideo ? "postVideo" : "postImage";
+        const resourceType = isVideo ? "video" : "image";
+
+        const uploadFromBuffer = (fileBuffer) => {
+            return new Promise((resolve, reject) => {
+                const uploadStream = Cloudinary.uploader.upload_stream(
+                    {
+                        resource_type: resourceType,
+                        folder: folderName,
+                    },
+                    (error, result) => {
+                        if (result) resolve(result);
+                        else reject(error);
+                    }
+                );
+
+                streamifier.createReadStream(fileBuffer).pipe(uploadStream);
+            });
+        };
+
+        const result = await uploadFromBuffer(req.file.buffer);
+
+        const newPost = new Post({
+            caption,
+            postOwner: uid,
+            media: result.secure_url,
+            video: isVideo,
+            image: isImage,
+            isClip: true,
+        });
+
+        const response = await newPost.save();
+
+        const user = await People.findById(uid);
+        const friends = user.friends;
+
+        // await if it’s async
+        await createNotification(friends, uid, "post", newPost._id);
+
+        res.status(201).json({
+            message: "Post created successfully",
+            data: response,
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error while creating clip" });
+    }
+});
+
 
 route.get("/publicpost/:id", async (req, res) => {
     try {
@@ -167,6 +270,7 @@ route.get("/publicpost/:id", async (req, res) => {
         console.error("Error fetching posts:", error);
     }
 });
+
 
 route.get("/getpostbyid/:id", async (req, res) => {
     try {
@@ -201,7 +305,8 @@ route.get("/postinfo/:id", async (req, res) => {
         console.log(err);
         res.status(500).json({ message: "internal server error in postinfo/API" });
     }
-})
+});
+
 
 route.post("/addinnerreplay", async (req, res) => {
     try {
@@ -241,15 +346,17 @@ route.post("/addNestedInnerReplay", async (req, res) => {
 
 route.post("/addlike_comment", async (req, res) => {
     try {
-        const { commentId, postId } = req.body;
+
+        const { commentId, postId, type } = req.body;
         const token = req.cookies.token;
         const decode = jwt.verify(token, jwt_sicret);
         const uid = decode.userId;
         const post = await Post.findById(postId);
         if (!post) return res.status(404).json({ message: "post not found 404" });
         const comment = post.comments.id(commentId);
-        comment?.likes.push({ user: uid });
+        comment?.likes.push({ user: uid, type: type });
         await post.save();
+
     } catch (error) {
         console.error("Error adding like:", error);
     }
@@ -257,39 +364,83 @@ route.post("/addlike_comment", async (req, res) => {
 
 route.post("/addlike_replay", async (req, res) => {
     try {
-        const { commentId, postId, repId } = req.body;
+        const { commentId, postId, repId, type } = req.body;
         const token = req.cookies.token;
         const decode = jwt.verify(token, jwt_sicret);
         const uid = decode.userId;
+
         const post = await Post.findById(postId);
         if (!post) return res.status(404).json({ message: "post not found 404" });
-        const comment = post.comments.id(commentId);
-        const replay = comment.replies.id(repId);
-        replay.likes.push({ user: uid });
-        await post.save();
-    } catch (error) {
-        console.error("Error adding like:", error);
-    }
-})
 
+        const comment = post.comments.id(commentId);
+        if (!comment) return res.status(404).json({ message: "comment not found" });
+
+        const reply = comment.replies.id(repId);
+        if (!reply) return res.status(404).json({ message: "reply not found" });
+
+        reply.likes.push({ user: uid, type });
+
+        await post.save();
+        res.json({ message: "Like added successfully", post });
+    } catch (error) {
+        console.log("Error adding like:", error);
+        res.status(500).json({ message: "internal server error" });
+    }
+});
 
 route.post("/inner_addlike_replay", async (req, res) => {
     try {
-        const { commentId, postId, repId, nestId } = req.body;
+        const { commentId, postId, repId, nestId, type } = req.body;
         const token = req.cookies.token;
+
+        if (!token) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
         const decode = jwt.verify(token, jwt_sicret);
         const uid = decode.userId;
+
+        // Find post
         const post = await Post.findById(postId);
-        if (!post) return res.status(404).json({ message: "post not found 404" });
+        if (!post) return res.status(404).json({ message: "Post not found" });
+
+        // Find nested reply
         const comment = post.comments.id(commentId);
+        if (!comment) return res.status(404).json({ message: "Comment not found" });
+
         const replay = comment.replies.id(repId);
+        if (!replay) return res.status(404).json({ message: "Replay not found" });
+
         const nestrep = replay.replay.id(nestId);
-        nestrep.likes.push({ user: uid });
+        if (!nestrep) return res.status(404).json({ message: "Nested reply not found" });
+
+        // Like/Unlike logic
+        const existingLikeIndex = nestrep.likes.findIndex(
+            (like) => like.user.toString() === uid.toString()
+        );
+
+        if (existingLikeIndex > -1) {
+
+            if (nestrep.likes[existingLikeIndex].user?.toString() === uid) {
+                // Same type → unlike (remove)
+                nestrep.likes.splice(existingLikeIndex, 1);
+            } else {
+                // Different type → update type
+                nestrep.likes[existingLikeIndex].type = type;
+            }
+        } else {
+            // Not liked yet → add like
+            nestrep.likes.push({ user: uid, type });
+        }
+
         await post.save();
+
+        res.status(200).json({ message: "Like/Unlike updated successfully" });
     } catch (error) {
         console.error("Error adding like:", error);
+        res.status(500).json({ message: "Internal server error" });
     }
-})
+});
 
 route.get("/randompost/:id", async (req, res) => {
     try {
@@ -375,5 +526,17 @@ route.get("/deleteall", async (req, res) => {
         res.status(500).json({ message: "internal server error" });
     }
 })
+
+route.get("/get_react/:id", async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id)?.populate("likes.user", "image name _id");
+        if (!post) return res.status(404).json({ message: "post not found" });
+        const react = post.likes;
+        res.json(react);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "internal server error" });
+    }
+});
 
 module.exports = route;

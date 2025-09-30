@@ -22,9 +22,14 @@ const commentSchema = new mongoose.Schema({
                     user: {
                         type: mongoose.Schema.Types.ObjectId,
                         ref: "user"
+                    },
+
+                    type: {
+                        type: String
                     }
                 }
             ],
+
             replay: [
                 {
                     text: String,
@@ -37,6 +42,10 @@ const commentSchema = new mongoose.Schema({
                             user: {
                                 type: mongoose.Schema.Types.ObjectId,
                                 ref: "user"
+                            },
+
+                            type: {
+                                type: String
                             }
                         }
                     ],
@@ -52,6 +61,10 @@ const commentSchema = new mongoose.Schema({
                                 user: {
                                     type: mongoose.Schema.Types.ObjectId,
                                     ref: "user"
+                                },
+
+                                type: {
+                                    type: String
                                 }
                             }
                         ]
@@ -65,6 +78,10 @@ const commentSchema = new mongoose.Schema({
             user: {
                 type: mongoose.Schema.Types.ObjectId,
                 ref: "user"
+            },
+
+            type: {
+                type: String
             }
         }
     ],
@@ -80,6 +97,12 @@ const postSchema = new mongoose.Schema({
         ref: "user",
         required: true
     },
+
+    isClip: {
+        type: Boolean,
+        default: false
+    },
+
     media: {
         type: String,
         required: true
@@ -95,10 +118,33 @@ const postSchema = new mongoose.Schema({
     comments: [commentSchema],  // Embedded comment schema
     likes: [
         {
+            user: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "user"
+            },
+
+            type: {
+                type: String,
+            }
+        }
+    ],
+
+    share: [{
+        user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "user"
         }
-    ]  // Track users who liked the post
+    }],
+    views: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "user"
+        },
+        counter: {
+            type: Number,
+            default: 0
+        }
+    }]
 });
 
 const Post = mongoose.model("Post", postSchema);

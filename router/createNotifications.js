@@ -7,7 +7,6 @@ route.post("/add", async (req, res) => {
     try {
         const { receiverId, senderId, type, commentId, text } = req.body;
         const notification = new Notification({ receiverId, senderId, type, text, commentId });
-        console.log("isValid", mongoose.Types.ObjectId.isValid(commentId));
         const counter = new Counter({ countWoner: receiverId, _type: "notifications" })
         const response = await notification.save();
         await counter.save();
