@@ -254,6 +254,36 @@ route.post("/createClip/:id", upload.single("media"), async (req, res) => {
     }
 });
 
+route.post("/countView", async (req, res) => {
+    try {
+        const { id, isClip = false, user } = req.body;
+
+        if (!id || !user) {
+            return res.status(400).json({ message: "Missing required fields" });
+        }
+
+        const uid = new mongoose.Types.ObjectId(id);
+        const uuid = new mongoose.Types.ObjectId(user);
+
+        const View = await Post.findOneAndUpdate(
+            { _id: uid, isClip },                        // match by post ID and clip flag
+            { $addToSet: { views: { user: uuid } } },   // prevent duplicate user
+            { new: true }
+        );
+
+        if (!View) {
+            return res.status(404).json({ message: "Document not found" });
+        }
+
+        res.status(200).json({
+            message: "View counted",
+            totalViews: View.views.length,
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error while counting view" });
+    }
+});
 
 route.get("/publicpost/:id", async (req, res) => {
     try {
@@ -422,14 +452,14 @@ route.post("/inner_addlike_replay", async (req, res) => {
         if (existingLikeIndex > -1) {
 
             if (nestrep.likes[existingLikeIndex].user?.toString() === uid) {
-                // Same type → unlike (remove)
+
                 nestrep.likes.splice(existingLikeIndex, 1);
             } else {
-                // Different type → update type
+
                 nestrep.likes[existingLikeIndex].type = type;
             }
         } else {
-            // Not liked yet → add like
+
             nestrep.likes.push({ user: uid, type });
         }
 

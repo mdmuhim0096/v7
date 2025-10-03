@@ -135,16 +135,7 @@ const postSchema = new mongoose.Schema({
             ref: "user"
         }
     }],
-    views: [{
-        user: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "user"
-        },
-        counter: {
-            type: Number,
-            default: 0
-        }
-    }]
+    views: [{ user: { type: mongoose.Schema.Types.ObjectId, ref: "user" } }]
 });
 
 const Post = mongoose.model("Post", postSchema);
