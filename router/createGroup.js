@@ -251,4 +251,19 @@ route.post("/filteruser", async (req, res) => {
 });
 
 
+route.get("/:name", async (req, res) => {
+    try {
+        const { name } = req.params;
+
+        const groups = await Group.find({
+            name: { $regex: name, $options: "i" } // partial + case-insensitive
+        }).select("name description groupImage members"); // return only needed fields
+
+        res.json(groups);
+    } catch (error) {
+        console.error("Error fetching group:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+
 module.exports = route;

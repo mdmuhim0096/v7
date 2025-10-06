@@ -569,4 +569,25 @@ route.get("/get_react/:id", async (req, res) => {
     }
 });
 
+// Search posts by caption (partial + case-insensitive)
+route.get("/:caption", async (req, res) => {
+    try {
+        const { caption } = req.params;
+
+        const posts = await Post.find({
+            caption: { $regex: caption, $options: "i" } // partial + case-insensitive
+        })
+            .populate("postOwner", "username id image name")
+            .populate("comments.user", "username email")
+            .populate("comments.replies.user", "username email")
+            .populate("likes", "username");
+
+        res.json(posts);
+    } catch (error) {
+        console.error("Error fetching posts:", error);
+        res.status(500).json({ error: "Server error while fetching posts" });
+    }
+});
+
+
 module.exports = route;

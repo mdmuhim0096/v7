@@ -10,8 +10,6 @@ const Group = require("../model/createGroup");
 const Cloudinary = require("../databas/cloudinary");
 const streamifier = require("streamifier");
 
-const { deletePreviusFile } = require("../lib/fileHandeler");
-
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 route.post("/signup", upload.single("img"), async (req, res) => {
@@ -417,7 +415,7 @@ route.get("/randomuser/:id", async (req, res) => {
     try {
         console.log(req.params.id)
         const user = await People.findById(req.params.id).populate("friends", "name image _id");
-        if(!user) return  res.status(404).json({ message: "user not found"});
+        if (!user) return res.status(404).json({ message: "user not found" });
         console.log(user)
         res.status(200).json({ message: "here is your useer", user });
     } catch (error) {
@@ -549,6 +547,22 @@ route.post("/leftfromgroup", async (req, res) => {
         res.status(500).json({ message: "error in textcolor /  userData" });
     }
 })
+
+route.get("/:name", async (req, res) => {
+    try {
+        const { name } = req.params;
+
+        // Use regex for case-insensitive partial search
+        const users = await People.find({
+            name: { $regex: name, $options: "i" }
+        }).select("username email name image"); // select only what you need
+
+        res.json(users);
+    } catch (error) {
+        console.error("Error fetching user:", error);
+        res.status(500).json({ message: "Server error while fetching user" });
+    }
+});
 
 
 route.get("/dp", async (req, res) => {
